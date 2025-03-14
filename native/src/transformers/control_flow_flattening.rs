@@ -129,6 +129,47 @@ impl VisitMut for Cleanup {
         }
         *n = new_stmtns;
     }
+
+    fn visit_mut_stmt(&mut self, stmt: &mut swc_ecma_ast::Stmt) {
+        // Visit children recursively first
+        stmt.visit_mut_children_with(self);
+    
+        // Handle only `for` statements
+        if let swc_ecma_ast::Stmt::For(for_stmt) = stmt {
+            // Check the specific conditions for the `for` loop
+            if for_stmt.test.is_none()
+                && for_stmt.update.is_none()
+                && for_stmt.init.is_some()
+                && for_stmt
+                    .init
+                    .as_ref()
+                    .unwrap()
+                    .as_expr()
+                    .unwrap()
+                    .is_ident()
+                && for_stmt
+                    .init
+                    .as_ref()
+                    .unwrap()
+                    .as_expr()
+                    .unwrap()
+                    .as_ident()
+                    .unwrap()
+                    .sym
+                    == *"CFF_REPLACE_ME"
+            {
+                // If the conditions are met, replace the `for` loop with its body
+                if let Some(body) = &for_stmt.body.as_block() {
+                    // Replace the `for` loop with the block of statements inside it
+                    *stmt = swc_ecma_ast::Stmt::Block(swc_ecma_ast::BlockStmt {
+                        stmts: body.stmts.clone(),
+                        span: Span::dummy(),
+                    });
+                }
+            }
+        }
+    }
+    
 }
 
 impl VisitMut for Visitor {
@@ -166,7 +207,11 @@ impl VisitMut for Visitor {
             let i: usize = o.parse().unwrap();
 
             let stmt_at_pos = cases.cases.iter().find(|p| p.key == i);
-            stmts.push(stmt_at_pos.unwrap().stmt.to_owned());
+            let stmt = stmt_at_pos.unwrap().stmt.to_owned();
+            if matches!(stmt, swc_ecma_ast::Stmt::Continue(..)) {
+                continue;
+            }
+            stmts.push(stmt);
         }
 
         *n = swc_ecma_ast::ForStmt {

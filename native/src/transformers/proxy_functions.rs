@@ -3,7 +3,7 @@ use swc_common::util::take::Take;
 use swc_common::Span;
 use swc_core::ecma::ast::Program;
 use swc_core::ecma::visit::VisitMut;
-use swc_ecma_ast::{AssignOp, BinExpr, BinaryOp, CallExpr, Expr};
+use swc_ecma_ast::{AssignOp, BinExpr, BinaryOp, CallExpr, Expr, ParenExpr};
 use swc_ecma_visit::{Visit, VisitMutWith, VisitWith};
 
 #[derive(Default)]
@@ -81,19 +81,24 @@ impl VisitMut for FindProxyAssignments {
             self.assignments
                 .push(Proxy::string(key.to_string(), str.str));
 
-            // n.value.take();
-            // n.key.take();
+            n.value.take();
+            n.key.take();
         } else if as_fn.is_some() {
             let func = &as_fn.unwrap().function;
             let stmts = <Option<swc_ecma_ast::BlockStmt> as Clone>::clone(&func.body)
                 .unwrap()
                 .stmts;
             let return_stmt = stmts.first().unwrap().as_return_stmt().unwrap();
-            let expr = <Option<Box<swc_ecma_ast::Expr>> as Clone>::clone(&return_stmt.arg).unwrap();
+            let mut expr = <Option<Box<swc_ecma_ast::Expr>> as Clone>::clone(&return_stmt.arg).unwrap();
             // println!("visit_key_value_prop: Unsupported {} (function)", key,);
-
+            let seq = expr.as_seq();
+            if seq.is_some() {
+                let seq = seq.unwrap();
+                expr = seq.exprs.last().unwrap().to_owned();
+            }
             let as_call = expr.as_call();
             let as_bin = expr.as_bin();
+            let as_seq = expr.as_seq();
             if as_call.is_some() {
                 self.assignments.push(Proxy::call(key.to_string()));
                 n.value.take();
@@ -270,21 +275,23 @@ impl VisitMut for ReplaceProxies {
                 // );
                 let left = &args.first().unwrap().expr;
                 let right = &args.last().unwrap().expr;
-                if !p.reversed {
-                    *n = Expr::from(BinExpr {
-                        span: Span::dummy(),
-                        op: p.bin_operator,
-                        left: Box::new(*left.to_owned()),
-                        right: Box::new(*right.to_owned()),
-                    })
-                } else {
-                    *n = Expr::from(BinExpr {
-                        span: Span::dummy(),
-                        op: p.bin_operator,
-                        right: Box::new(*left.to_owned()),
-                        left: Box::new(*right.to_owned()),
-                    })
-                }
+                
+                let left_expr = Box::new(Expr::Paren(ParenExpr {
+                    span: Span::dummy(),
+                    expr: Box::new(*left.to_owned()),
+                }));
+
+                let right_expr = Box::new(Expr::Paren(ParenExpr {
+                    span: Span::dummy(),
+                    expr: Box::new(*right.to_owned()),
+                }));
+
+                *n = Expr::from(BinExpr {
+                    span: Span::dummy(),
+                    op: p.bin_operator,
+                    left: if p.reversed { right_expr.clone() } else { left_expr.clone() },
+                    right: if p.reversed { left_expr } else { right_expr },
+                });
             } else if p.proxy_type == "call" {
                 let mut vec_args = args.to_vec();
                 let callee = vec_args.remove(0);

@@ -8,3 +8,4 @@ pub mod sequence_expressions;
 pub mod simplify_binary;
 pub mod strings;
 pub mod useless_if;
+pub mod useless_statements;

@@ -35,15 +35,18 @@ pub fn deobfuscate(cnfg: &mut VMConfig, src: &str) -> String {
                         as_folder(transformers::sequence_expressions::Visitor),
                         expr_simplifier(marks, Default::default()),
                         transforms::optimization::simplify::dce::dce(Default::default(), marks,),
-                        as_folder(transformers::useless_if::Visitor),
-                        as_folder(transformers::simplify_binary::Visitor),
                         
+                        // as_folder(transformers::useless_if::Visitor),
+                        // as_folder(transformers::simplify_binary::Visitor),
+                        
+                        // as_folder(transformers::useless_statements::Visitor),
                         // extractor: Only required for parsing the script, not deobfuscating it
-                        as_folder(extractor::Visitor { cnfg: cnfg }),
+                        // as_folder(extractor::Visitor { cnfg: cnfg }),
 
                         // Optional
                         simplifier(marks, Config::default()),
                         fixer(None),
+                        // as_folder(transformers::useless_statements::Visitor),
                     )
                 },
             )

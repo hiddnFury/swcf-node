@@ -2,7 +2,7 @@ use swc_common::util::take::Take;
 use swc_common::Span;
 use swc_core::ecma::utils::ExprFactory;
 use swc_core::ecma::visit::{VisitMut, VisitMutWith};
-use swc_ecma_ast::{ForStmt, IfStmt, Program, ReturnStmt};
+use swc_ecma_ast::{ForStmt, IfStmt, Program, ReturnStmt, Expr, Callee, CallExpr, FnExpr, ParenExpr};
 
 pub struct Visitor;
 
@@ -18,6 +18,24 @@ impl VisitMut for Visitor {
                 if expr.is_seq() {
                     let seq = expr.as_seq().unwrap();
                     for expr in &seq.exprs {
+                        if let Expr::Call(call_expr) = &**expr {
+                            if let Callee::Expr(callee_expr) = &call_expr.callee {
+                                if let Expr::Fn(fn_expr) = &**callee_expr {
+                                    if fn_expr.ident.is_none() {
+                                        new_stmtns.push(Box::new(Expr::Call(CallExpr {
+                                            span: Span::dummy(),
+                                            callee: Callee::Expr(Box::new(Expr::Paren(ParenExpr {
+                                                    span: Span::dummy(),
+                                                    expr: callee_expr.clone()
+                                                }))),
+                                            args: call_expr.args.to_owned(),
+                                            type_args: call_expr.type_args.to_owned(),  
+                                        })).into_stmt());
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
                         new_stmtns
                             .push(<Box<swc_ecma_ast::Expr> as Clone>::clone(&expr).into_stmt());
                     }
@@ -33,7 +51,25 @@ impl VisitMut for Visitor {
                     let tmp = ret.arg.to_owned().unwrap();
                     let mut seq = tmp.as_seq().unwrap().exprs.to_vec();
                     let last = seq.pop();
-                    for expr in seq {
+                    for expr in &seq {
+                        if let Expr::Call(call_expr) = &**expr {
+                            if let Callee::Expr(callee_expr) = &call_expr.callee {
+                                if let Expr::Fn(fn_expr) = &**callee_expr {
+                                    if fn_expr.ident.is_none() {
+                                        new_stmtns.push(Box::new(Expr::Call(CallExpr {
+                                            span: Span::dummy(),
+                                            callee: Callee::Expr(Box::new(Expr::Paren(ParenExpr {
+                                                    span: Span::dummy(),
+                                                    expr: callee_expr.clone()
+                                                }))),
+                                            args: call_expr.args.to_owned(),
+                                            type_args: call_expr.type_args.to_owned(),  
+                                        })).into_stmt());
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
                         new_stmtns
                             .push(<Box<swc_ecma_ast::Expr> as Clone>::clone(&expr).into_stmt());
                     }
@@ -51,6 +87,24 @@ impl VisitMut for Visitor {
                     let last = seq.pop().unwrap();
 
                     for expr in &seq {
+                        if let Expr::Call(call_expr) = &**expr {
+                            if let Callee::Expr(callee_expr) = &call_expr.callee {
+                                if let Expr::Fn(fn_expr) = &**callee_expr {
+                                    if fn_expr.ident.is_none() {
+                                        new_stmtns.push(Box::new(Expr::Call(CallExpr {
+                                            span: Span::dummy(),
+                                            callee: Callee::Expr(Box::new(Expr::Paren(ParenExpr {
+                                                    span: Span::dummy(),
+                                                    expr: callee_expr.clone()
+                                                }))),
+                                            args: call_expr.args.to_owned(),
+                                            type_args: call_expr.type_args.to_owned(),  
+                                        })).into_stmt());
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
                         new_stmtns
                             .push(<Box<swc_ecma_ast::Expr> as Clone>::clone(&expr).into_stmt());
                     }
@@ -85,6 +139,24 @@ impl VisitMut for Visitor {
                     let last = seq.pop();
 
                     for expr in &seq {
+                        if let Expr::Call(call_expr) = &**expr {
+                            if let Callee::Expr(callee_expr) = &call_expr.callee {
+                                if let Expr::Fn(fn_expr) = &**callee_expr {
+                                    if fn_expr.ident.is_none() {
+                                        new_stmtns.push(Box::new(Expr::Call(CallExpr {
+                                            span: Span::dummy(),
+                                            callee: Callee::Expr(Box::new(Expr::Paren(ParenExpr {
+                                                    span: Span::dummy(),
+                                                    expr: callee_expr.clone()
+                                                }))),
+                                            args: call_expr.args.to_owned(),
+                                            type_args: call_expr.type_args.to_owned(),  
+                                        })).into_stmt());
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
                         new_stmtns
                             .push(<Box<swc_ecma_ast::Expr> as Clone>::clone(&expr).into_stmt());
                     }
