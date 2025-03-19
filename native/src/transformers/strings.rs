@@ -1,8 +1,9 @@
 use regex::Regex;
 use swc_core::ecma::atoms::JsWord;
 use swc_core::ecma::visit::{VisitMut, VisitMutWith};
-use swc_ecma_ast::{Expr, Lit, Program, Str};
+use swc_ecma_ast::{Expr, Lit, Program, Str, AssignOp, FnDecl};
 use swc_ecma_visit::{Visit, VisitWith};
+use swc_common::util::take::Take;
 
 #[derive(Default)]
 struct FindInteger {
@@ -19,11 +20,12 @@ impl Visit for FindInteger {
 struct ReplaceProxyCalls {
     subtract: i32,
     strings: Vec<String>,
+    assignments: Vec<String> // all variables that points to function b
 }
 
 impl ReplaceProxyCalls {
     pub fn new(subtract: i32, strings: Vec<String>) -> Self {
-        Self { subtract, strings }
+        Self { subtract, strings, assignments: vec![] }
     }
 }
 
@@ -39,6 +41,13 @@ impl VisitMut for ReplaceProxyCalls {
         if n.args.len() != 1 {
             return;
         }
+        //check if callee is in assignments
+        let callee = n.callee.as_expr().unwrap().as_ident();
+        if let Some(callee) = callee {
+            if !self.assignments.contains(&callee.sym.to_string()) {
+                return;
+            }
+        }
 
         let arg = n.args[0].expr.as_lit();
         if let Some(p) = arg {
@@ -53,6 +62,40 @@ impl VisitMut for ReplaceProxyCalls {
                         let str = self.strings[res].to_owned();
                         *expr = Expr::Lit(Lit::Str(Str::from(str)));
                     }
+                }
+            }
+        }
+    }
+
+    fn visit_mut_fn_decl(&mut self, n: &mut FnDecl) {
+        let params_in_assignments = n.function.params.iter().filter(|x| self.assignments.contains(&x.pat.as_ident().unwrap().sym.to_string())).map(|x| x.pat.as_ident().unwrap().sym.to_string()).collect::<Vec<String>>();
+        let params_not_in_assignments = n.function.params.iter().filter(|x| !self.assignments.contains(&x.pat.as_ident().unwrap().sym.to_string())).map(|x| x.pat.as_ident().unwrap().sym.to_string()).collect::<Vec<String>>();
+        // // Remove identifiers from assignments that are in the function params
+        self.assignments = self.assignments.iter().filter(|x| !params_in_assignments.contains(x)).map(|x| x.to_string()).collect();
+        n.visit_mut_children_with(self);
+        // // Restore the assignments
+        self.assignments = self.assignments.iter().filter(|x| !params_not_in_assignments.contains(x)).map(|x| x.to_string()).collect();
+        // // Add assignments that were already in the function params
+        self.assignments.extend(params_in_assignments);
+    }
+
+    fn visit_mut_assign_expr(&mut self, n: &mut swc_ecma_ast::AssignExpr) {
+        n.visit_mut_children_with(self);
+        if n.op != AssignOp::Assign {
+            return;
+        }
+        let right_var = n.right.as_ident();
+        // Check if expression is xx = b
+        if let Some(right) = right_var {
+            let left = n.left.as_ident();
+            if let Some(left) = left {
+                if right.sym == "b" {
+                    self.assignments.push(left.sym.to_string());
+                    n.take();
+                }
+                else if self.assignments.contains(&right.sym.to_string()) {
+                    self.assignments.push(left.sym.to_string());
+                    n.take();
                 }
             }
         }
