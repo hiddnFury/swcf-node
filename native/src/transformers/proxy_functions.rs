@@ -239,58 +239,58 @@ impl VisitMut for FindProxyAssignments {
             let as_call = expr.as_call();
             let as_bin = expr.as_bin();
             if as_call.is_some() {
-                // // Handle special case:
-                // // e.pHFEm = function(i, j) {
-                // //     return i + j;
-                // // }
-                // // f.abCxY = function(b, c) {
-                // //   return e.PHFEm(b, c);
-                // // }
-                // // In this case, we need to handle the call as a binary operation
-                // // Check if the function is a call to another function
-                // let call = as_call.unwrap();
-                // let callee = call.callee.as_expr().unwrap();
-                // if let Some(as_member) = callee.as_member() {
-                //     let comp = as_member.prop.as_computed().unwrap();
-                //     let proxy_key = match comp.expr.as_lit().unwrap() {
-                //         Lit::Str(Str { value, .. }) => Some(value.to_string()),
-                //         _ => None, // Not a string literal
-                //     };
+                // Handle special case:
+                // e.pHFEm = function(i, j) {
+                //     return i + j;
+                // }
+                // f.abCxY = function(b, c) {
+                //   return e.PHFEm(b, c);
+                // }
+                // In this case, we need to handle the call as a binary operation
+                // Check if the function is a call to another function
+                let call = as_call.unwrap();
+                let callee = call.callee.as_expr().unwrap();
+                if let Some(as_member) = callee.as_member() {
+                    let comp = as_member.prop.as_computed().unwrap();
+                    let proxy_key = match comp.expr.as_lit().unwrap() {
+                        Lit::Str(Str { value, .. }) => Some(value.to_string()),
+                        _ => None, // Not a string literal
+                    };
 
-                //     //Find Proxy with proxy_key in assignments
-                //     let proxy_key_str = proxy_key.clone().unwrap();
-                //     let maybe_p = self.assignments.iter().find(|p| p.key == proxy_key_str);
-                //     if maybe_p.is_none() {
-                //         return;
-                //     }
-                //     let p = maybe_p.unwrap();
+                    //Find Proxy with proxy_key in assignments
+                    let proxy_key_str = proxy_key.clone().unwrap();
+                    let maybe_p = self.assignments.iter().find(|p| p.key == proxy_key_str);
+                    if maybe_p.is_none() {
+                        return;
+                    }
+                    let p = maybe_p.unwrap();
                     
-                //     if p.proxy_type == "call" {
-                //         //check if assignment already exists for the key
-                //         if self.assignments.iter().find(|p| p.key == key.str).is_some() {
-                //             println!("Assignment already exists for key: {}", key.str);
-                //             return;
-                //         }
-                //         self.assignments.push(Proxy::call(key.str));
-                //     } else if p.proxy_type == "binary" {
-                //         //check if assignment already exists for the key
-                //         if self.assignments.iter().find(|p| p.key == key.str).is_some() {
-                //             println!("Assignment already exists for key: {}", key.str);
-                //             return;
-                //         }
-                //         self.assignments
-                //             .push(Proxy::binary(key.str, p.bin_operator, p.reversed));
-                //     }
-                // }
-                // else {
-                //     //check if assignment already exists for the key
-                //     if self.assignments.iter().find(|p| p.key == key.str).is_some() {
-                //         println!("Assignment already exists for key: {}", key.str);
-                //         return;
-                //     }
-                //     self.assignments.push(Proxy::call(key.str));
-                // }
-                // n.take();
+                    if p.proxy_type == "call" {
+                        //check if assignment already exists for the key
+                        if self.assignments.iter().find(|p| p.key == key.str).is_some() {
+                            println!("Assignment already exists for key: {}", key.str);
+                            return;
+                        }
+                        self.assignments.push(Proxy::call(key.str));
+                    } else if p.proxy_type == "binary" {
+                        //check if assignment already exists for the key
+                        if self.assignments.iter().find(|p| p.key == key.str).is_some() {
+                            println!("Assignment already exists for key: {}", key.str);
+                            return;
+                        }
+                        self.assignments
+                            .push(Proxy::binary(key.str, p.bin_operator, p.reversed));
+                    }
+                }
+                else {
+                    //check if assignment already exists for the key
+                    if self.assignments.iter().find(|p| p.key == key.str).is_some() {
+                        println!("Assignment already exists for key: {}", key.str);
+                        return;
+                    }
+                    self.assignments.push(Proxy::call(key.str));
+                }
+                n.take();
             } else if as_bin.is_some() {
                 // let bin = as_bin.unwrap();
                 // //check if assignment already exists for the key
