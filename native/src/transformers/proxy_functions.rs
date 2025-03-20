@@ -3,7 +3,7 @@ use swc_common::util::take::Take;
 use swc_common::Span;
 use swc_core::ecma::ast::Program;
 use swc_core::ecma::visit::VisitMut;
-use swc_ecma_ast::{AssignOp, BinExpr, BinaryOp, CallExpr, Expr, ParenExpr};
+use swc_ecma_ast::{AssignOp, BinExpr, BinaryOp, CallExpr, Expr, ParenExpr, Lit, Str};
 use swc_ecma_visit::{Visit, VisitMutWith, VisitWith};
 
 #[derive(Default)]
@@ -68,7 +68,7 @@ impl VisitMut for FindProxyAssignments {
             return;
         }
         let key = &key_opt.unwrap().value;
-        if key.len() != 5 {
+        if key.len() != 5 || key == "event" || key == "kuMu1" {
             return;
         }
 
@@ -98,28 +98,81 @@ impl VisitMut for FindProxyAssignments {
             }
             let as_call = expr.as_call();
             let as_bin = expr.as_bin();
-            let as_seq = expr.as_seq();
             if as_call.is_some() {
-                self.assignments.push(Proxy::call(key.to_string()));
-                n.value.take();
-                n.key.take();
-            } else if as_bin.is_some() {
-                let bin = as_bin.unwrap();
+                // // Handle special case:
+                // // e.pHFEm = function(i, j) {
+                // //     return i + j;
+                // // }
+                // // f.abCxY = function(b, c) {
+                // //   return e.PHFEm(b, c);
+                // // }
+                // // In this case, we need to handle the call as a binary operation
+                // // Check if the function is a call to another function
+                // let call = as_call.unwrap();
+                // let callee = call.callee.as_expr().unwrap();
+                // if let Some(as_member) = callee.as_member() {
+                //     let comp = as_member.prop.as_computed().unwrap();
+                //     let proxy_key = match comp.expr.as_lit().unwrap() {
+                //         Lit::Str(Str { value, .. }) => Some(value.to_string()),
+                //         _ => None, // Not a string literal
+                //     };
 
-                let reversed = bin.right.as_ident().unwrap().sym.as_str()
-                    == func
-                        .params
-                        .last()
-                        .unwrap()
-                        .pat
-                        .as_ident()
-                        .unwrap()
-                        .sym
-                        .as_str();
-                self.assignments
-                    .push(Proxy::binary(key.to_string(), bin.op, reversed));
-                n.value.take();
-                n.key.take();
+                //     //Find Proxy with proxy_key in assignments
+                //     let proxy_key_str = proxy_key.clone().unwrap();
+                //     let maybe_p = self.assignments.iter().find(|p| p.key == proxy_key_str);
+                //     if maybe_p.is_none() {
+                //         return;
+                //     }
+                //     let p = maybe_p.unwrap();
+                    
+                //     if p.proxy_type == "call" {
+                //         //check if assignment already exists for the key
+                //         if self.assignments.iter().find(|p| p.key == key.to_string()).is_some() {
+                //             println!("Assignment already exists for key: {}", key);
+                //             return;
+                //         }
+                //         self.assignments.push(Proxy::call(key.to_string()));
+                //     } else if p.proxy_type == "binary" {
+                //         //check if assignment already exists for the key
+                //         if self.assignments.iter().find(|p| p.key == key.to_string()).is_some() {
+                //             println!("Assignment already exists for key: {}", key);
+                //             return;
+                //         }
+                //         self.assignments
+                //             .push(Proxy::binary(key.to_string(), p.bin_operator, p.reversed));
+                //     }
+                // }
+                // else {
+                //     //check if assignment already exists for the key
+                //     if self.assignments.iter().find(|p| p.key == key.to_string()).is_some() {
+                //         println!("Assignment already exists for key: {}", key);
+                //         return;
+                //     }
+                //     self.assignments.push(Proxy::call(key.to_string()));
+                // }
+                // n.value.take();
+                // n.key.take();
+            } else if as_bin.is_some() {
+                // let bin = as_bin.unwrap();
+                // //check if assignment already exists for the key
+                // if self.assignments.iter().find(|p| p.key == key.to_string()).is_some() {
+                //     println!("Assignment already exists for key: {}", key);
+                //     return;
+                // }
+                // let reversed = bin.right.as_ident().unwrap().sym.as_str()
+                //     == func
+                //         .params
+                //         .first()
+                //         .unwrap()
+                //         .pat
+                //         .as_ident()
+                //         .unwrap()
+                //         .sym
+                //         .as_str();
+                // self.assignments
+                //     .push(Proxy::binary(key.to_string(), bin.op, reversed));
+                // n.value.take();
+                // n.key.take();
             }
         } else {
             // println!("visit_key_value_prop {} {:?}", key, n.value);
@@ -141,7 +194,7 @@ impl VisitMut for FindProxyAssignments {
         let mut key = FindString::default();
         simple.unwrap().visit_children_with(&mut key);
 
-        if key.str.len() != 5 {
+        if key.str.len() != 5 || key.str == "event" || key.str == "kuMu1" {
             return;
         }
 
@@ -174,33 +227,91 @@ impl VisitMut for FindProxyAssignments {
             if as_return_stmt.is_none() {
                 return;
             }
-            let expr =
+            let mut expr =
                 <Option<Box<swc_ecma_ast::Expr>> as Clone>::clone(&as_return_stmt.unwrap().arg)
                     .unwrap();
             // println!("visit_key_value_prop: Unsupported {} (function)", key,);
-
+            let seq = expr.as_seq();
+            if seq.is_some() {
+                let seq = seq.unwrap();
+                expr = seq.exprs.last().unwrap().to_owned();
+            }
             let as_call = expr.as_call();
             let as_bin = expr.as_bin();
             if as_call.is_some() {
-                self.assignments.push(Proxy::call(key.str));
-                n.take();
-            } else if as_bin.is_some() {
-                let bin = as_bin.unwrap();
+                // // Handle special case:
+                // // e.pHFEm = function(i, j) {
+                // //     return i + j;
+                // // }
+                // // f.abCxY = function(b, c) {
+                // //   return e.PHFEm(b, c);
+                // // }
+                // // In this case, we need to handle the call as a binary operation
+                // // Check if the function is a call to another function
+                // let call = as_call.unwrap();
+                // let callee = call.callee.as_expr().unwrap();
+                // if let Some(as_member) = callee.as_member() {
+                //     let comp = as_member.prop.as_computed().unwrap();
+                //     let proxy_key = match comp.expr.as_lit().unwrap() {
+                //         Lit::Str(Str { value, .. }) => Some(value.to_string()),
+                //         _ => None, // Not a string literal
+                //     };
 
-                let reversed = bin.right.as_ident().unwrap().sym.as_str()
-                    == fun
-                        .function
-                        .params
-                        .last()
-                        .unwrap()
-                        .pat
-                        .as_ident()
-                        .unwrap()
-                        .sym
-                        .as_str();
-                self.assignments
-                    .push(Proxy::binary(key.str, bin.op, reversed));
-                n.take();
+                //     //Find Proxy with proxy_key in assignments
+                //     let proxy_key_str = proxy_key.clone().unwrap();
+                //     let maybe_p = self.assignments.iter().find(|p| p.key == proxy_key_str);
+                //     if maybe_p.is_none() {
+                //         return;
+                //     }
+                //     let p = maybe_p.unwrap();
+                    
+                //     if p.proxy_type == "call" {
+                //         //check if assignment already exists for the key
+                //         if self.assignments.iter().find(|p| p.key == key.str).is_some() {
+                //             println!("Assignment already exists for key: {}", key.str);
+                //             return;
+                //         }
+                //         self.assignments.push(Proxy::call(key.str));
+                //     } else if p.proxy_type == "binary" {
+                //         //check if assignment already exists for the key
+                //         if self.assignments.iter().find(|p| p.key == key.str).is_some() {
+                //             println!("Assignment already exists for key: {}", key.str);
+                //             return;
+                //         }
+                //         self.assignments
+                //             .push(Proxy::binary(key.str, p.bin_operator, p.reversed));
+                //     }
+                // }
+                // else {
+                //     //check if assignment already exists for the key
+                //     if self.assignments.iter().find(|p| p.key == key.str).is_some() {
+                //         println!("Assignment already exists for key: {}", key.str);
+                //         return;
+                //     }
+                //     self.assignments.push(Proxy::call(key.str));
+                // }
+                // n.take();
+            } else if as_bin.is_some() {
+                // let bin = as_bin.unwrap();
+                // //check if assignment already exists for the key
+                // if self.assignments.iter().find(|p| p.key == key.str).is_some() {
+                //     println!("Assignment already exists for key: {}", key.str);
+                //     return;
+                // }
+                // let reversed = bin.right.as_ident().unwrap().sym.as_str()
+                //     == fun
+                //         .function
+                //         .params
+                //         .first()
+                //         .unwrap()
+                //         .pat
+                //         .as_ident()
+                //         .unwrap()
+                //         .sym
+                //         .as_str();
+                // self.assignments
+                //     .push(Proxy::binary(key.str.clone(), bin.op, reversed));
+                // n.take();
             }
         }
     }
@@ -286,11 +397,14 @@ impl VisitMut for ReplaceProxies {
                     expr: Box::new(*right.to_owned()),
                 }));
 
-                *n = Expr::from(BinExpr {
+                *n = Expr::Paren(ParenExpr {
                     span: Span::dummy(),
-                    op: p.bin_operator,
-                    left: if p.reversed { right_expr.clone() } else { left_expr.clone() },
-                    right: if p.reversed { left_expr } else { right_expr },
+                    expr: Box::new(Expr::from(BinExpr {
+                        span: Span::dummy(),
+                        op: p.bin_operator,
+                        left: if p.reversed { right_expr.clone() } else { left_expr.clone() },
+                        right: if p.reversed { left_expr } else { right_expr },
+                    })),
                 });
             } else if p.proxy_type == "call" {
                 let mut vec_args = args.to_vec();
