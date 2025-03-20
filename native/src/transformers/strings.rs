@@ -1,7 +1,7 @@
 use regex::Regex;
 use swc_core::ecma::atoms::JsWord;
 use swc_core::ecma::visit::{VisitMut, VisitMutWith};
-use swc_ecma_ast::{Expr, Lit, Program, Str, AssignOp, FnDecl};
+use swc_ecma_ast::{Expr, Lit, Program, Str, AssignOp, FnExpr, FnDecl};
 use swc_ecma_visit::{Visit, VisitWith};
 use swc_common::util::take::Take;
 
@@ -68,6 +68,18 @@ impl VisitMut for ReplaceProxyCalls {
     }
 
     fn visit_mut_fn_decl(&mut self, n: &mut FnDecl) {
+        let params_in_assignments = n.function.params.iter().filter(|x| self.assignments.contains(&x.pat.as_ident().unwrap().sym.to_string())).map(|x| x.pat.as_ident().unwrap().sym.to_string()).collect::<Vec<String>>();
+        let params_not_in_assignments = n.function.params.iter().filter(|x| !self.assignments.contains(&x.pat.as_ident().unwrap().sym.to_string())).map(|x| x.pat.as_ident().unwrap().sym.to_string()).collect::<Vec<String>>();
+        // // Remove identifiers from assignments that are in the function params
+        self.assignments = self.assignments.iter().filter(|x| !params_in_assignments.contains(x)).map(|x| x.to_string()).collect();
+        n.visit_mut_children_with(self);
+        // // Restore the assignments
+        self.assignments = self.assignments.iter().filter(|x| !params_not_in_assignments.contains(x)).map(|x| x.to_string()).collect();
+        // // Add assignments that were already in the function params
+        self.assignments.extend(params_in_assignments);
+    }
+
+    fn visit_mut_fn_expr(&mut self, n: &mut FnExpr) {
         let params_in_assignments = n.function.params.iter().filter(|x| self.assignments.contains(&x.pat.as_ident().unwrap().sym.to_string())).map(|x| x.pat.as_ident().unwrap().sym.to_string()).collect::<Vec<String>>();
         let params_not_in_assignments = n.function.params.iter().filter(|x| !self.assignments.contains(&x.pat.as_ident().unwrap().sym.to_string())).map(|x| x.pat.as_ident().unwrap().sym.to_string()).collect::<Vec<String>>();
         // // Remove identifiers from assignments that are in the function params
