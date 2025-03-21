@@ -74,8 +74,33 @@ impl VisitMut for FindProxyAssignments {
 
         let as_lit = n.value.as_lit();
         let as_fn = n.value.as_fn_expr();
+        let as_member = n.value.as_member();
+        if as_member.is_some() {
+            let comp = as_member.unwrap().prop.as_computed();
+            if comp.is_none() {
+                return;
+            }
 
-        if as_lit.is_some() {
+            let mut str = FindString::default();
+            let prop_name = comp.unwrap().to_owned();
+            prop_name.visit_children_with(&mut str);
+            if str.str.len() != 5 {
+                return;
+            }
+
+            let maybe_p = self.assignments.iter().find(|p| p.key == str.str);
+
+            if maybe_p.is_none() {
+                return;
+            }
+            let p = maybe_p.unwrap();
+
+            if p.proxy_type == "string" {
+                self.assignments.push(Proxy::string(key.to_string(), p.string_value.clone()));
+                n.value.take();
+                n.key.take();
+            }
+        } else if as_lit.is_some() {
             let mut str = FindString::default();
             n.value.visit_children_with(&mut str);
             self.assignments
@@ -186,7 +211,7 @@ impl VisitMut for FindProxyAssignments {
         }
         let right_lit = n.right.as_lit();
         let right_fun = n.right.as_fn_expr();
-
+        let right_mem = n.right.as_member();
         let simple = n.left.as_simple();
         if simple.is_none() {
             return;
@@ -198,7 +223,31 @@ impl VisitMut for FindProxyAssignments {
             return;
         }
 
-        if right_lit.is_some() {
+        if right_mem.is_some() {
+            let comp = right_mem.unwrap().prop.as_computed();
+            if comp.is_none() {
+                return;
+            }
+
+            let mut str = FindString::default();
+            let prop_name = comp.unwrap().to_owned();
+            prop_name.visit_children_with(&mut str);
+            if str.str.len() != 5 {
+                return;
+            }
+
+            let maybe_p = self.assignments.iter().find(|p| p.key == str.str);
+
+            if maybe_p.is_none() {
+                return;
+            }
+            let p = maybe_p.unwrap();
+
+            if p.proxy_type == "string" {
+                self.assignments.push(Proxy::string(key.str, p.string_value.clone()));
+                n.take();
+            }
+        } else if right_lit.is_some() {
             let mut str = FindString::default();
             right_lit.unwrap().visit_children_with(&mut str);
 
